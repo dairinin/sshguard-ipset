@@ -1,3 +1,3 @@
 # sshguard-ipset
 
-Use ipset to block atackers with sshguard. Applies on Ubuntu or Debian
+Use ipset to block ssh scanners with sshguard. Applies on Ubuntu or Debian
