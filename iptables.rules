@@ -1,0 +1,4 @@
+*filter
+-N sshguard
+-A INPUT -p tcp --dport 22 -j sshguard
+COMMIT

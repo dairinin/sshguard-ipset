@@ -1,0 +1,135 @@
+#!/bin/sh
+
+IPSET='ipset'
+SET='sshguard'
+CHAIN='sshguard'
+
+__ipset_family() {
+	[ $1 -eq 6 ] && echo 'inet6' || echo 'inet'
+}
+
+__af_name() {
+	echo "family $(__ipset_family $1)"
+}
+
+af_name() {
+	__af_name $SSHG_ADDRKIND
+}
+
+__set_family() {
+	[ $1 -eq 6 ] && echo "v6" || echo "v4"
+}
+
+set_family() {
+	__set_family $SSHG_ADDRKIND
+}
+
+__set_name() {
+	echo "${1}-$(__set_family $2)"
+}
+
+set_name() {
+	__set_name $SET $SSHG_ADDRKIND
+}
+
+__iptablesx() {
+	[ $1 -eq 6 ] && echo 'ip6tables' || echo 'iptables'
+}
+
+iptablesx() {
+	__iptablesx $SSHG_ADDRKIND
+}
+
+ipset_add() {
+	echo add $(set_name) $1
+}
+
+ipset_del() {
+	echo del $(set_name) $1
+}
+
+ipset_create() {
+	for af in 4 6; do
+		AF_SET=$(__set_name $SET $af)
+		AF_FAMILY=$(__af_name $af)
+		AF_IPTABLES=$(__iptablesx $af)
+
+		if ! $IPSET create $AF_SET hash:ip $AF_FAMILY 2>/dev/null; then
+			$IPSET flush $AF_SET
+		fi
+
+		if ! $AF_IPTABLES -F $CHAIN 2>/dev/null; then
+			$AF_IPTABLES -N $CHAIN
+		fi
+
+		$AF_IPTABLES -A $CHAIN -m set --match-set $AF_SET src -j DROP
+	done
+}
+
+ipset_destroy() {
+	for af in 4 6; do
+		AF_SET=$(__set_name $SET $af)
+		AF_FAMILY=$(__af_name $af)
+		AF_IPTABLES=$(__iptablesx $af)
+
+		$AF_IPTABLES -F $CHAIN
+		$IPSET destroy $AF_SET 2>/dev/null
+	done
+}
+
+ipset_flush() {
+	for af in 4 6; do
+		AF_SET=$(__set_name $SET $af)
+		AF_FAMILY=$(__af_name $af)
+		AF_IPTABLES=$(__iptablesx $af)
+
+		$IPSET flush $AF_SET
+	done
+}
+
+block_addrs() {
+	IFS=','
+	set -- $1
+	unset IFS
+
+	for a; do
+		ipset_add $a
+	done | $IPSET restore -exist
+}
+
+unblock_addrs() {
+	IFS=','
+	set -- $1
+	unset IFS
+
+	for a; do
+		ipset_del $a
+	done | $IPSET restore -exist
+}
+
+case "$SSHG_ACTION" in
+init)
+	echo "Init ipset"
+	ipset_create
+	;;
+fin)
+	echo "Finish ipset"
+	ipset_destroy
+	;;
+flush)
+	echo "Flush ipset"
+	ipset_flush
+	;;
+block|block_list)
+	echo "Block"
+	block_addrs $SSHG_ADDR
+	;;
+release)
+	echo "Unblock"
+	unblock_addrs $SSHG_ADDR
+	;;
+*)
+	echo "Unknown action $SSHG_ACTION"
+	exit 1
+	;;
+esac
