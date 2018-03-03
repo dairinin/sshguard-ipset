@@ -1,0 +1,8 @@
+# Configuration for netfilter-persistent
+# Plugins may extend this file or have their own
+
+FLUSH_ON_STOP=0
+
+# Only listed ipsets are saved/restored
+# All sets if not set
+MANAGED_SETS=

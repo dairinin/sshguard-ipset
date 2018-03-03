@@ -1,0 +1,73 @@
+#!/bin/sh
+
+set -e
+
+rc=0
+
+load_rules()
+{
+	if [ ! -f /etc/iptables/sets ]; then
+		echo "Warning: skipping IPSET (no rules to load)"
+	else
+		ipset -exist restore < /etc/iptables/sets 2>/dev/null
+		if [ $? -ne 0 ]; then
+			rc=1
+		fi
+	fi
+}
+
+save_rules()
+{
+        touch /etc/iptables/sets
+        chmod 0640 /etc/iptables/sets
+	
+	{
+		if [ -z "$MANAGED_SETS" ]; then
+			ipset save
+		else
+			for s in $MANAGED_SETS; do
+				ipset save $s
+			done
+		fi
+	} > /etc/iptables/sets
+
+	if [ $? -ne 0 ]; then
+		rc=1
+	fi
+}
+
+flush_rules()
+{
+	if [ -z "$MANAGED_SETS" ]; then
+		ipset flush
+	else
+		for s in $MANAGED_SETS; do
+			ipset flush $s
+		done
+	fi
+}
+
+case "$1" in
+start)
+	load_rules
+	;;
+restart|reload|force-reload)
+	flush_rules
+	load_rules
+	;;
+save)
+	save_rules
+	;;
+stop)
+	flush_rules
+	;;
+flush)
+	flush_rules
+	;;
+*)
+    echo "Usage: $0 {start|restart|reload|force-reload|save|flush}" >&2
+    exit 1
+    ;;
+esac
+
+exit $rc

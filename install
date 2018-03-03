@@ -1,0 +1,9 @@
+#!/bin/sh
+
+apt-get install sshguard ipset iptables-persistent
+
+cp -rf usr etc /
+iptables-restore < iptables.rules
+
+/etc/init.d/sshguard restart
+netfilter-persistent save

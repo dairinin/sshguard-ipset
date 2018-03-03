@@ -1,4 +1,8 @@
 *filter
+-P DROP
+-F INPUT
 -N sshguard
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 -A INPUT -p tcp --dport 22 -j sshguard
+-A INPUT -p tcp --dport -j ACCEPT
 COMMIT
