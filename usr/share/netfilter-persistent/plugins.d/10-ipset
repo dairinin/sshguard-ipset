@@ -3,33 +3,67 @@
 set -e
 
 rc=0
+RULES_SAVE='/dev/stdout'
 
 load_rules()
 {
 	if [ ! -f /etc/iptables/sets ]; then
 		echo "Warning: skipping IPSET (no rules to load)"
 	else
-		ipset -exist restore < /etc/iptables/sets 2>/dev/null
+		ipset -exist restore < $RULES_SAVE 2>/dev/null
 		if [ $? -ne 0 ]; then
 			rc=1
 		fi
 	fi
 }
 
-save_rules()
-{
-        touch /etc/iptables/sets
-        chmod 0640 /etc/iptables/sets
+ipset_save() {
+	ipset save $1
+}
+
+ipset_save_def() {
+	ipset save $1 | while read a rest; do
+		case "$a" in
+		create)
+			echo "$a $rest"
+			;;
+		esac
+	done
+}
+
+save_rules() {
+	if [ ! -f $RULES_SAVE ]; then
+	        touch $RULES_SAVE
+        	chmod 0640 $RULES_SAVE
+	fi
 	
 	{
-		if [ -z "$MANAGED_SETS" ]; then
-			ipset save
-		else
+		case "$MANAGED_SETS" in
+		"")
+			ipset_save
+			;;
+		\*)
+			ipset_save_def
+			;;
+		*)
 			for s in $MANAGED_SETS; do
-				ipset save $s
+				proc=
+
+				case "$s" in
+				*\*)
+					s=${s%*\*}
+					proc='ipset_save_def'
+					;;
+				*)
+					proc='ipset_save'
+					;;
+				esac
+
+				eval "[ -z \"\$${s}_set\" ] && $proc \"$s\" && ${s}_set=1" || break
 			done
-		fi
-	} > /etc/iptables/sets
+			;;
+		esac
+	} > $RULES_SAVE
 
 	if [ $? -ne 0 ]; then
 		rc=1
@@ -38,13 +72,23 @@ save_rules()
 
 flush_rules()
 {
-	if [ -z "$MANAGED_SETS" ]; then
+	case "$MANAGED_SETS" in
+	""|\*)
 		ipset flush
-	else
+		;;
+	*)
 		for s in $MANAGED_SETS; do
-			ipset flush $s
+			case "$s" in
+			\**)
+				ipset flush ${s%*\*}
+				;;
+			*)
+				ipset_flush $1
+				;;
+			esac
 		done
-	fi
+		;;
+	esac
 }
 
 case "$1" in

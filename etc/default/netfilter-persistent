@@ -5,4 +5,6 @@ FLUSH_ON_STOP=0
 
 # Only listed ipsets are saved/restored
 # All sets if not set
+# Sets with names ending in '*' are saved as definitions only
+# Single '*' saves all sets as definitions
 MANAGED_SETS=
