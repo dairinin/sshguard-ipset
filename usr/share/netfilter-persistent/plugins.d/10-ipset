@@ -3,11 +3,11 @@
 set -e
 
 rc=0
-RULES_SAVE='/dev/stdout'
+RULES_SAVE='/etc/iptables/sets'
 
 load_rules()
 {
-	if [ ! -f /etc/iptables/sets ]; then
+	if [ ! -f $RULES_SAVE ]; then
 		echo "Warning: skipping IPSET (no rules to load)"
 	else
 		ipset -exist restore < $RULES_SAVE 2>/dev/null
